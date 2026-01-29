@@ -1,0 +1,363 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the CineHub application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "Profile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Profile",
+      "type": "object",
+      "description": "Represents a user profile within the CineHub application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the profile entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Profile)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the profile."
+        },
+        "icon": {
+          "type": "string",
+          "description": "URL or path to the profile icon.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name"
+      ]
+    },
+    "Movie": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Movie",
+      "type": "object",
+      "description": "Represents a movie in the CineHub catalog.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the movie entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the movie."
+        },
+        "year": {
+          "type": "number",
+          "description": "Release year of the movie."
+        },
+        "poster": {
+          "type": "string",
+          "description": "URL or path to the movie poster.",
+          "format": "uri"
+        },
+        "backdrop": {
+          "type": "string",
+          "description": "URL or path to the movie backdrop.",
+          "format": "uri"
+        },
+        "genres": {
+          "type": "array",
+          "description": "Genres of the movie.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "synopsis": {
+          "type": "string",
+          "description": "Synopsis or plot summary of the movie."
+        },
+        "trailer": {
+          "type": "string",
+          "description": "URL for the movie trailer.",
+          "format": "uri"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Movie rating."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "year",
+        "poster"
+      ]
+    },
+    "WatchlistItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "WatchlistItem",
+      "type": "object",
+      "description": "Represents a movie in a user's watchlist.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the watchlist item."
+        },
+        "profileId": {
+          "type": "string",
+          "description": "Reference to Profile. (Relationship: Profile 1:N WatchlistItem)"
+        },
+        "movieId": {
+          "type": "string",
+          "description": "Reference to Movie. (Relationship: Movie 1:N WatchlistItem)"
+        },
+        "addedDate": {
+          "type": "string",
+          "description": "Date the movie was added to the watchlist.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "profileId",
+        "movieId",
+        "addedDate"
+      ]
+    },
+    "Favorite": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Favorite",
+      "type": "object",
+      "description": "Represents a movie added to a user's favorites.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the favorite item."
+        },
+        "profileId": {
+          "type": "string",
+          "description": "Reference to Profile. (Relationship: Profile 1:N Favorite)"
+        },
+        "movieId": {
+          "type": "string",
+          "description": "Reference to Movie. (Relationship: Movie 1:N Favorite)"
+        },
+        "addedDate": {
+          "type": "string",
+          "description": "Date the movie was added to favorites.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "profileId",
+        "movieId",
+        "addedDate"
+      ]
+    },
+    "Genre": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Genre",
+      "type": "object",
+      "description": "Represents a movie genre.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the genre."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the genre (e.g., Action, Comedy)."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "MovieGenre": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MovieGenre",
+      "type": "object",
+      "description": "Represents the relationship between a movie and a genre (Many-to-Many).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MovieGenre entity."
+        },
+        "movieId": {
+          "type": "string",
+          "description": "Reference to Movie. (Relationship: Movie N:N Genre)"
+        },
+        "genreId": {
+          "type": "string",
+          "description": "Reference to Genre. (Relationship: Movie N:N Genre)"
+        }
+      },
+      "required": [
+        "id",
+        "movieId",
+        "genreId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "anonymous",
+      "google.com",
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data. Access is restricted to the user themselves.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/profiles/{profileId}",
+        "definition": {
+          "entityName": "Profile",
+          "schema": {
+            "$ref": "#/backend/entities/Profile"
+          },
+          "description": "Stores user profiles. Access is restricted to the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "profileId",
+              "description": "The unique identifier of the profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/profiles/{profileId}/watchlist/{watchlistItemId}",
+        "definition": {
+          "entityName": "WatchlistItem",
+          "schema": {
+            "$ref": "#/backend/entities/WatchlistItem"
+          },
+          "description": "Stores watchlist items. Access is restricted to the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "profileId",
+              "description": "The unique identifier of the profile."
+            },
+            {
+              "name": "watchlistItemId",
+              "description": "The unique identifier of the watchlist item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/profiles/{profileId}/favorites/{favoriteId}",
+        "definition": {
+          "entityName": "Favorite",
+          "schema": {
+            "$ref": "#/backend/entities/Favorite"
+          },
+          "description": "Stores favorite movies. Access is restricted to the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "profileId",
+              "description": "The unique identifier of the profile."
+            },
+            {
+              "name": "favoriteId",
+              "description": "The unique identifier of the favorite item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/genres/{genreId}",
+        "definition": {
+          "entityName": "Genre",
+          "schema": {
+            "$ref": "#/backend/entities/Genre"
+          },
+          "description": "Stores a list of genres. Read access is public, write access is restricted to admins.",
+          "params": [
+            {
+              "name": "genreId",
+              "description": "The unique identifier of the genre."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/movies/{movieId}",
+        "definition": {
+          "entityName": "Movie",
+          "schema": {
+            "$ref": "#/backend/entities/Movie"
+          },
+          "description": "Stores movie information. Read access is public, write access is restricted to admins.",
+          "params": [
+            {
+              "name": "movieId",
+              "description": "The unique identifier of the movie."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/movie_genres/{movieGenreId}",
+        "definition": {
+          "entityName": "MovieGenre",
+          "schema": {
+            "$ref": "#/backend/entities/MovieGenre"
+          },
+          "description": "Stores the relationship between movies and genres. Read access is public, write access is restricted to admins.",
+          "params": [
+            {
+              "name": "movieGenreId",
+              "description": "The unique identifier of the MovieGenre entity."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure Authorization Independence, support QAPs (Queries are not Filters), and maintain data clarity.  Authorization Independence is achieved by utilizing path-based ownership for private user data and avoiding `get()` calls in security rules.  This approach makes security rules simpler, easier to audit, and more robust, especially when dealing with transactions and batch operations.\n\n*   **/users/{userId}**: Stores user data, with access restricted to the user themselves.\n*   **/users/{userId}/profiles/{profileId}**:  Stores user profiles. Profile documents are secured based on path-based ownership.\n*   **/users/{userId}/profiles/{profileId}/watchlist/{watchlistItemId}**: Stores watchlist items. Watchlist items are secured based on path-based ownership, ensuring only the user can access them.\n*   **/users/{userId}/profiles/{profileId}/favorites/{favoriteId}**: Stores favorite movies. Favorite items are secured based on path-based ownership, ensuring only the user can access them.\n*   **/genres/{genreId}**: Stores a list of genres available in the application. This collection can be world readable, but writes should be restricted to admins. QAPs supported as the security rule is a simple `allow read: if true`.\n*   **/movies/{movieId}**: Stores movie information. Similar to genres, read access can be granted to all users while write access is restricted to admins. QAPs supported as the security rule is a simple `allow read: if true`.\n*   **/movie_genres/{movieGenreId}**: Stores the relationship between movies and genres. Access can be read for all users. Write should be allowed to admins. QAPs supported as the security rule is a simple `allow read: if true`."
+  }
+}
+    

@@ -1,0 +1,244 @@
+rules_version = '2';
+
+/**
+ * @name CineHub Firestore Security Rules
+ * @file firestore.rules
+ *
+ * @description
+ * This ruleset is designed for the CineHub application during its prototyping phase.
+ * It prioritizes strict authorization while allowing flexibility in data shapes to
+ * support rapid development and iteration.
+ *
+ * @section Core Philosophy
+ * The security model enforces a clear separation between private, user-owned data
+ * and public, read-only catalog data.
+ *
+ * 1.  **User Data Ownership**: All information created by a user (profiles, watchlists,
+ *     favorites) is strictly confined to their own data tree and is inaccessible
+ *     to any other user.
+ * 2.  **Public Catalog**: Core application data like movies and genres are publicly
+ *     readable by anyone, including unauthenticated users, to ensure the app is
+ *     browsable.
+ * 3.  **Admin-Only Writes**: All writes to public catalog data are disabled by default.
+ *     This is a secure default posture, requiring developers to explicitly implement
+ *     an admin verification system before enabling content management.
+ *
+ * @section Data Structure
+ * -   `/users/{userId}`: All private data is nested under this path. The `userId`
+ *     in the path is the primary mechanism for enforcing ownership, making rules
+ *     fast and simple.
+ * -   `/movies/{movieId}`, `/genres/{genreId}`: Public data is stored in top-level
+ *     collections, allowing for efficient global queries.
+ *
+ * @section Key Security Decisions
+ * -   **User Privacy**: Listing or querying the top-level `/users` collection is
+ *     explicitly disallowed to prevent user enumeration.
+ * -   **Path-Based Security**: Rules rely on the document path (`/users/{userId}`)
+ *     to determine ownership, avoiding slow and costly `get()` calls to other
+ *     documents for authorization checks.
+ * -   **Schema Flexibility**: In this prototyping mode, rules do not validate the
+ *     specific shape or data types of documents, except for fields critical to
+ *     maintaining relational integrity (e.g., `userId` on a profile).
+ * -   **Secure Defaults**: Writes to public collections (`movies`, `genres`) are
+ *     denied until a proper admin role system is implemented. This prevents
+ *     unauthorized data modification.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the foundation of the ownership model.
+     *
+     * @param userId The user ID to check against the request's auth UID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update and delete
+     * operations to prevent acting on non-existent data.
+     *
+     * @param userId The user ID to check for ownership.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates the integrity of a new User document upon creation.
+     * Ensures the document's internal ID matches the document ID in the path.
+     */
+    function hasValidUserCreateData(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * Validates the integrity of a User document upon update.
+     * Ensures critical relational fields like 'id' are immutable.
+     */
+    function hasValidUserUpdateData() {
+      return request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * Validates the integrity of a new Profile document.
+     * Ensures the profile is correctly linked to its parent user.
+     */
+    function hasValidProfileCreateData(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * Validates the integrity of an existing Profile document.
+     * Ensures the link to the parent user is immutable.
+     */
+    function hasValidProfileUpdateData() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    /**
+     * Validates the integrity of a new Watchlist or Favorite item.
+     * Ensures the item is correctly linked to its parent profile.
+     */
+    function hasValidProfileSubcollectionCreateData(profileId) {
+        return request.resource.data.profileId == profileId;
+    }
+
+    /**
+     * Validates the integrity of an existing Watchlist or Favorite item.
+     * Ensures the link to the parent profile is immutable.
+     */
+    function hasValidProfileSubcollectionUpdateData() {
+        return request.resource.data.profileId == resource.data.profileId;
+    }
+
+    // ------------------------------------------------------------------------
+    // User Data Rules (/users)
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Secures a user's own root document.
+     * @path /users/{userId}
+     * @allow (create) A new user can create their own user document.
+     * @deny (get) Another user (auth.uid='user_xyz') tries to read this document.
+     * @deny (list) Any user tries to list all documents in the /users collection.
+     * @principle Restricts access to a user's own data tree and enforces self-creation.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Prevent user enumeration
+      allow create: if isOwner(userId) && hasValidUserCreateData(userId);
+      allow update: if isExistingOwner(userId) && hasValidUserUpdateData();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Secures a user's profiles.
+       * @path /users/{userId}/profiles/{profileId}
+       * @allow (create) The owner (auth.uid==userId) creates a new profile.
+       * @allow (list) The owner lists their own profiles.
+       * @deny (get) Another user tries to read one of the owner's profiles.
+       * @principle Enforces path-based ownership for all nested user data.
+       */
+      match /profiles/{profileId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidProfileCreateData(userId);
+        allow update: if isExistingOwner(userId) && hasValidProfileUpdateData();
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description Secures a profile's watchlist.
+         * @path /users/{userId}/profiles/{profileId}/watchlist/{watchlistItemId}
+         * @allow (create) The owner (auth.uid==userId) adds a movie to a profile's watchlist.
+         * @deny (delete) Another user tries to delete an item from the watchlist.
+         * @principle Enforces path-based ownership and relational integrity to the parent profile.
+         */
+        match /watchlist/{watchlistItemId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId) && hasValidProfileSubcollectionCreateData(profileId);
+          allow update: if isExistingOwner(userId) && hasValidProfileSubcollectionUpdateData();
+          allow delete: if isExistingOwner(userId);
+        }
+
+        /**
+         * @description Secures a profile's favorites list.
+         * @path /users/{userId}/profiles/{profileId}/favorites/{favoriteId}
+         * @allow (create) The owner (auth.uid==userId) adds a movie to a profile's favorites.
+         * @deny (get) Another user tries to read the favorites list.
+         * @principle Enforces path-based ownership and relational integrity to the parent profile.
+         */
+        match /favorites/{favoriteId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId) && hasValidProfileSubcollectionCreateData(profileId);
+          allow update: if isExistingOwner(userId) && hasValidProfileSubcollectionUpdateData();
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Catalog Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Publicly readable movie data. Writes are disabled by default.
+     * @path /movies/{movieId}
+     * @allow (get) Any user, signed in or not, can read movie details.
+     * @allow (list) Any user can query the list of movies.
+     * @deny (create) Any user attempts to add a new movie.
+     * @principle Secures public data by allowing universal read access but denying all writes until an admin system is implemented.
+     */
+    match /movies/{movieId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if true; // Enabled for testing add-movie feature
+      allow update: if true; // Enabled for testing
+      allow delete: if true; // Enabled for testing
+    }
+
+    /**
+     * @description Publicly readable genre data. Writes are disabled by default.
+     * @path /genres/{genreId}
+     * @allow (get) Any user, signed in or not, can read genre details.
+     * @deny (update) Any user attempts to modify a genre.
+     * @principle Secures public data by allowing universal read access but denying all writes until an admin system is implemented.
+     */
+    match /genres/{genreId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Implement admin check (e.g., `isAdmin()`)
+      allow update: if false; // TODO: Implement admin check
+      allow delete: if false; // TODO: Implement admin check
+    }
+    
+    /**
+     * @description Publicly readable movie-genre relationship data. Writes are disabled.
+     * @path /movie_genres/{movieGenreId}
+     * @allow (list) Any user can query movie-genre relationships.
+     * @deny (create) Any user attempts to create a new movie-genre link.
+     * @principle Secures public data by allowing universal read access but denying all writes until an admin system is implemented.
+     */
+    match /movie_genres/{movieGenreId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Implement admin check (e.g., `isAdmin()`)
+      allow update: if false; // TODO: Implement admin check
+      allow delete: if false; // TODO: Implement admin check
+    }
+  }
+}

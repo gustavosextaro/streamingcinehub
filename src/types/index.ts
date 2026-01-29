@@ -1,0 +1,27 @@
+export interface Movie {
+  id: number;
+  title: string;
+  name?: string;
+  original_title?: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  overview: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  genre_ids: number[];
+  runtime?: number;
+  genres?: { id: number; name: string }[];
+  trailer_url?: string;
+}
+
+export interface MovieDetails extends Movie {
+  tagline?: string | null;
+  videos: {
+    results: {
+      key: string;
+      site: string;
+      type: string;
+    }[];
+  };
+}

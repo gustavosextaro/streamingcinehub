@@ -1,0 +1,182 @@
+'use client';
+
+import { useState, useTransition, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { useProfile } from '@/context/profile-context';
+import { findMovie } from '@/actions/admin';
+import type { MovieDetails } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
+import { Badge } from '@/components/ui/badge';
+
+export default function AddMoviePage() {
+    const { user, loading: authLoading } = useProfile();
+    const router = useRouter();
+    const { toast } = useToast();
+
+    const [isPending, startTransition] = useTransition();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [foundMovie, setFoundMovie] = useState<MovieDetails | null>(null);
+    const [customPosterUrl, setCustomPosterUrl] = useState('');
+
+    if (!authLoading && user?.email !== 'gustavosextaro@gmail.com') {
+        router.replace('/');
+        return null;
+    }
+
+    const handleSearch = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!searchQuery) return;
+
+        startTransition(async () => {
+            setFoundMovie(null);
+            try {
+                const movie = await findMovie(searchQuery);
+                if (movie) {
+                    const movieWithDefaults: MovieDetails = {
+                        ...movie,
+                        genre_ids: movie.genres?.map(g => g.id) || [],
+                        videos: { results: [] },
+                        trailer_url: null,
+                        vote_average: 0, 
+                    };
+                    setFoundMovie(movieWithDefaults);
+                    setCustomPosterUrl(movieWithDefaults.poster_path || '');
+                } else {
+                    // Falls back here if returns null (empty title etc)
+                    toast({
+                        variant: 'destructive',
+                        title: 'Filme não encontrado',
+                        description: 'Não foi possível encontrar um filme com esse título.',
+                    });
+                }
+            } catch (err: any) {
+                console.error("Search error:", err);
+                toast({
+                    variant: 'destructive',
+                    title: 'Erro na busca',
+                    description: err.message || 'Ocorreu um erro ao buscar o filme.',
+                });
+            }
+        });
+    };
+
+    const handleAddToCatalog = async () => {
+        if (!foundMovie) return;
+        
+        try {
+            const { initializeFirebase } = await import('@/firebase');
+            const { firestore } = initializeFirebase();
+            const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+
+            await addDoc(collection(firestore, 'movies'), {
+                ...foundMovie,
+                poster_path: customPosterUrl,
+                backdrop_path: customPosterUrl, // Update both
+                createdAt: serverTimestamp(),
+            });
+
+            toast({
+                title: 'Filme adicionado!',
+                description: `${foundMovie.title} foi adicionado ao catálogo com sucesso.`,
+            });
+            setFoundMovie(null);
+            setSearchQuery('');
+        } catch (error) {
+            console.error('Erro ao adicionar filme:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao adicionar',
+                description: 'Ocorreu um erro ao salvar o filme no banco de dados.',
+            });
+        }
+    };
+
+    if (authLoading) {
+        return <div className="container mx-auto px-4 md:px-8 py-8"><Skeleton className="h-96 w-full" /></div>;
+    }
+
+    return (
+        <div className="container mx-auto px-4 md:px-8 py-8">
+            <h1 className="text-4xl font-headline mb-8">Adicionar Novo Filme</h1>
+            
+            <Card className="max-w-2xl mx-auto">
+                <CardHeader>
+                    <CardTitle>Buscar Filme</CardTitle>
+                    <CardDescription>Cole um link do Letterboxd ou IMDb (ou digite o título) para buscar automaticamente.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSearch} className="flex items-center gap-4">
+                        <div className="w-full">
+                            <Label htmlFor="movie-title" className="sr-only">Título do Filme</Label>
+                            <Input
+                                id="movie-title"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Link do Letterboxd, IMDb ou nome do filme"
+                                disabled={isPending}
+                            />
+                        </div>
+                        <Button type="submit" disabled={isPending || !searchQuery}>
+                            {isPending ? 'Buscando...' : 'Buscar'}
+                        </Button>
+                    </form>
+
+                    {isPending && (
+                        <div className="mt-8 space-y-4">
+                            <Skeleton className="h-8 w-3/4" />
+                            <Skeleton className="h-4 w-1/4" />
+                            <Skeleton className="h-20 w-full" />
+                            <Skeleton className="h-10 w-40" />
+                        </div>
+                    )}
+
+                    {foundMovie && !isPending && (
+                         <div className="mt-8">
+                            <h2 className="text-2xl font-headline mb-4">Resultado da Busca</h2>
+                             <div className="flex flex-col md:flex-row gap-8">
+                                 <div className="w-full md:w-1/3">
+                                     <Image
+                                         src={foundMovie.poster_path || ''}
+                                         alt={`Pôster de ${foundMovie.title}`}
+                                         width={500}
+                                         height={750}
+                                         className="rounded-lg shadow-lg w-full"
+                                         data-ai-hint="movie poster"
+                                     />
+                                 </div>
+                                 <div className="w-full md:w-2/3 space-y-4">
+                                     <h3 className="text-3xl font-bold font-headline">{foundMovie.title} ({foundMovie.release_date.split('-')[0]})</h3>
+                                     <div className="flex flex-wrap gap-2">
+                                         {foundMovie.genres?.map(g => <Badge key={g.id} variant="secondary">{g.name}</Badge>)}
+                                     </div>
+                                     <p className="text-muted-foreground">{foundMovie.overview}</p>
+                                     <p><strong>Duração:</strong> {foundMovie.runtime} minutos</p>
+                                     
+                                     <div className="space-y-2 pt-4">
+                                         <Label htmlFor="custom-poster">URL do Pôster (Opcional)</Label>
+                                         <Input 
+                                            id="custom-poster"
+                                            value={customPosterUrl}
+                                            onChange={(e) => setCustomPosterUrl(e.target.value)}
+                                            placeholder="Cole o link do pôster aqui"
+                                         />
+                                     </div>
+
+                                     <Button onClick={handleAddToCatalog} className="w-full">
+                                        Adicionar ao Catálogo
+                                     </Button>
+                                 </div>
+                             </div>
+                         </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
