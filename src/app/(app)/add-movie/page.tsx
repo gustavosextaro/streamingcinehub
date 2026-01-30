@@ -42,7 +42,7 @@ export default function AddMoviePage() {
                         ...movie,
                         genre_ids: movie.genres?.map(g => g.id) || [],
                         videos: { results: [] },
-                        trailer_url: null,
+                        trailer_url: undefined,
                         vote_average: 0, 
                     };
                     setFoundMovie(movieWithDefaults);
@@ -151,7 +151,7 @@ export default function AddMoviePage() {
                                      />
                                  </div>
                                  <div className="w-full md:w-2/3 space-y-4">
-                                     <h3 className="text-3xl font-bold font-headline">{foundMovie.title} ({foundMovie.release_date.split('-')[0]})</h3>
+                                     <h3 className="text-3xl font-bold font-headline">{foundMovie.title} ({foundMovie.release_date?.split('-')[0] || 'N/A'})</h3>
                                      <div className="flex flex-wrap gap-2">
                                          {foundMovie.genres?.map(g => <Badge key={g.id} variant="secondary">{g.name}</Badge>)}
                                      </div>
