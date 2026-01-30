@@ -24,7 +24,8 @@ async function listMoviesInOrder() {
         console.log(`\n📽️  LISTA DE FILMES (Total: ${snapshot.size})`);
         console.log("=".repeat(80));
         
-        snapshot.forEach((doc: any, index: number) => {
+        let index = 0;
+        snapshot.forEach((doc) => {
             const data = doc.data();
             const createdAt = data.createdAt?.seconds 
                 ? new Date(data.createdAt.seconds * 1000) 
@@ -43,6 +44,7 @@ async function listMoviesInOrder() {
                 console.log(`     Lançamento: ${data.release_date}`);
             }
             console.log("");
+            index++;
         });
         
         console.log("=".repeat(80));
