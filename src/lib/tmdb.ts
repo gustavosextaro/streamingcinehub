@@ -26,8 +26,9 @@ async function getAllMovies(): Promise<MovieDetails[]> {
         
         firestoreMovies = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            // We assume the stored data matches MovieDetails structure
-            return data as MovieDetails;
+            // Serialize the data to remove Firestore Timestamp objects with toJSON methods
+            // This converts createdAt/updatedAt Timestamps to plain objects
+            return JSON.parse(JSON.stringify(data)) as MovieDetails;
         });
     } catch (e) {
         // Silently fail or warn on server if config is missing or permissions denied
@@ -54,7 +55,7 @@ export const getUpcoming = async (): Promise<Movie[]> => {
 export const getDiscover = async (filters: Record<string, string> = {}, page: number = 1): Promise<PaginatedResponse<Movie>> => {
     let movies = await getAllMovies();
     if (filters.with_genres) {
-        movies = movies.filter(m => m.genre_ids.includes(parseInt(filters.with_genres)));
+        movies = movies.filter(m => m.genre_ids && m.genre_ids.includes(parseInt(filters.with_genres)));
     }
     const total_results = movies.length;
     const total_pages = 1;
@@ -78,10 +79,10 @@ export const getMovieDetails = async (id: number): Promise<MovieDetails | undefi
 export const getRelatedMovies = async (id: number): Promise<Movie[]> => {
     const allMovies = await getAllMovies();
     const movie = allMovies.find(m => m.id === id);
-    if (!movie || !movie.genre_ids.length) return simulateFetch([]);
+    if (!movie || !movie.genre_ids || !movie.genre_ids.length) return simulateFetch([]);
     
     const primaryGenreId = movie.genre_ids[0];
-    const related = allMovies.filter(m => m.id !== id && m.genre_ids.includes(primaryGenreId));
+    const related = allMovies.filter(m => m.id !== id && m.genre_ids && m.genre_ids.includes(primaryGenreId));
     return simulateFetch(related.slice(0, 10));
 };
 

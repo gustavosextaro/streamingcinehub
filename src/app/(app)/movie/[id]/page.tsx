@@ -28,7 +28,7 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
 
   return (
     <div className="w-full">
-      <div className="relative h-[50vh] w-full">
+      <div className="relative h-[35vh] w-full">
         <Image
           src={getBackdropUrl(movie.backdrop_path || '')}
           alt={`Cena do filme ${movie.title}`}
@@ -40,7 +40,7 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
       </div>
 
-      <div className="container mx-auto px-4 md:px-8 -mt-24 md:-mt-48 pb-8 flex flex-col md:flex-row gap-8 z-10 relative">
+      <div className="container mx-auto px-4 md:px-8 -mt-16 md:-mt-24 pb-8 flex flex-col md:flex-row gap-8 z-10 relative">
         <div className="w-1/2 mx-auto md:w-1/3 lg:w-1/4">
           <Image
             src={getPosterUrl(movie.poster_path || '')}
@@ -51,7 +51,7 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
             data-ai-hint="movie poster"
           />
         </div>
-        <div className="w-full md:w-2/3 lg:w-3/4 md:pt-48 text-foreground">
+        <div className="w-full md:w-2/3 lg:w-3/4 md:pt-24 text-foreground">
           <h1 className="text-4xl md:text-6xl font-headline font-bold mb-2">{movie.title}</h1>
           <div className="flex items-center gap-4 text-muted-foreground mb-4">
             <span>{releaseYear}</span>
@@ -94,7 +94,9 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
       </div>
       
       {relatedMovies && relatedMovies.length > 0 && (
-        <MovieCarousel title="Relacionados" movies={relatedMovies} />
+        <div className="mt-16 md:mt-20">
+          <MovieCarousel title="Relacionados" movies={relatedMovies} />
+        </div>
       )}
     </div>
   );
