@@ -25,6 +25,7 @@ export interface MovieDetails extends Movie {
     }[];
   };
   drive_video_url?: string;
+  documentId?: string;
 }
 
 export interface PaginatedResponse<T> {

@@ -14,6 +14,7 @@ interface MoviePlayerSectionProps {
 
 export function MoviePlayerSection({ movie }: MoviePlayerSectionProps) {
   const [showPlayer, setShowPlayer] = useState(false);
+  console.log("Movie Data in Section:", movie);
 
   return (
     <>

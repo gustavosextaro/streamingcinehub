@@ -27,7 +27,10 @@ async function getAllMovies(): Promise<MovieDetails[]> {
             const data = doc.data();
             // Serialize the data to remove Firestore Timestamp objects with toJSON methods
             // This converts createdAt/updatedAt Timestamps to plain objects
-            return JSON.parse(JSON.stringify(data)) as MovieDetails;
+            return {
+                ...JSON.parse(JSON.stringify(data)),
+                documentId: doc.id
+            } as MovieDetails;
         });
     } catch (e) {
         // Silently fail or warn on server if config is missing or permissions denied

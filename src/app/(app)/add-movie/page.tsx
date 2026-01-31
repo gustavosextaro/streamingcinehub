@@ -23,6 +23,83 @@ export default function AddMoviePage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [foundMovie, setFoundMovie] = useState<MovieDetails | null>(null);
     const [customPosterUrl, setCustomPosterUrl] = useState('');
+    const [driveFolderUrl, setDriveFolderUrl] = useState('');
+    const [driveVideoUrl, setDriveVideoUrl] = useState('');
+    const [isFetchingDrive, setIsFetchingDrive] = useState(false);
+
+    const extractFolderId = (url: string) => {
+        const patterns = [
+            /\/folders\/([a-zA-Z0-9_-]+)/,
+            /\/drive\/u\/\d+\/folders\/([a-zA-Z0-9_-]+)/,
+            /id=([a-zA-Z0-9_-]+)/
+        ];
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) return match[1];
+        }
+        return null;
+    };
+
+    const handleFetchDriveInfo = async () => {
+        if (!driveFolderUrl) return;
+        
+        setIsFetchingDrive(true);
+        try {
+            const folderId = extractFolderId(driveFolderUrl);
+            if (!folderId) throw new Error("ID da pasta não encontrado no link.");
+
+            const apiKey = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY;
+            if (!apiKey) throw new Error("API Key do Google Drive não configurada.");
+
+            const response = await fetch(
+                `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${apiKey}&fields=files(id,name,mimeType,size)`
+            );
+            
+            if (!response.ok) throw new Error("Erro ao acessar API do Google Drive");
+            
+            const data = await response.json();
+            const files = data.files || [];
+            
+            // Filter likely video files
+            const videoFiles = files.filter((f: any) => 
+                f.mimeType?.startsWith('video/') ||
+                f.name?.endsWith('.mp4') || 
+                f.name?.endsWith('.mkv') ||
+                f.name?.endsWith('.avi')
+            );
+            
+            if (videoFiles.length === 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Nenhum vídeo encontrado',
+                    description: 'A pasta está vazia ou não é pública? Certifique-se de que a pasta está como "Qualquer pessoa com o link".'
+                });
+                return;
+            }
+
+            // Pick largest file usually the main movie
+            videoFiles.sort((a: any, b: any) => parseInt(b.size || '0') - parseInt(a.size || '0'));
+            const mainVideo = videoFiles[0];
+            
+            const directLink = `https://drive.google.com/file/d/${mainVideo.id}/view`;
+            setDriveVideoUrl(directLink);
+            
+            toast({
+                title: 'Vídeo encontrado!',
+                description: `Selecionado: ${mainVideo.name}`,
+            });
+
+        } catch (error: any) {
+            console.error("Drive fetch error:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao ler pasta',
+                description: error.message || 'Falha ao buscar arquivos no Drive.'
+            });
+        } finally {
+            setIsFetchingDrive(false);
+        }
+    };
 
     if (!authLoading && user?.email !== 'gustavosextaro@gmail.com') {
         router.replace('/');
@@ -72,12 +149,13 @@ export default function AddMoviePage() {
         try {
             const { initializeFirebase } = await import('@/firebase');
             const { firestore } = initializeFirebase();
-            const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
 
-            await addDoc(collection(firestore, 'movies'), {
+            await setDoc(doc(firestore, 'movies', String(foundMovie.id)), {
                 ...foundMovie,
                 poster_path: customPosterUrl,
-                backdrop_path: customPosterUrl, // Update both
+                backdrop_path: customPosterUrl,
+                drive_video_url: driveVideoUrl,
                 createdAt: serverTimestamp(),
             });
 
@@ -158,17 +236,54 @@ export default function AddMoviePage() {
                                      <p className="text-muted-foreground">{foundMovie.overview}</p>
                                      <p><strong>Duração:</strong> {foundMovie.runtime} minutos</p>
                                      
-                                     <div className="space-y-2 pt-4">
-                                         <Label htmlFor="custom-poster">URL do Pôster (Opcional)</Label>
-                                         <Input 
-                                            id="custom-poster"
-                                            value={customPosterUrl}
-                                            onChange={(e) => setCustomPosterUrl(e.target.value)}
-                                            placeholder="Cole o link do pôster aqui"
-                                         />
+                                     <div className="space-y-4 pt-4 border-t border-gray-800">
+                                         <h4 className="text-xl font-semibold">Configurações de Mídia</h4>
+                                         
+                                         <div className="space-y-2">
+                                             <Label htmlFor="drive-folder">Pasta do Google Drive (Opcional)</Label>
+                                             <div className="flex gap-2">
+                                                 <Input 
+                                                    id="drive-folder"
+                                                    value={driveFolderUrl}
+                                                    onChange={(e) => setDriveFolderUrl(e.target.value)}
+                                                    placeholder="Cole o link da pasta do Google Drive aqui"
+                                                 />
+                                                 <Button 
+                                                    type="button" 
+                                                    variant="secondary" 
+                                                    onClick={handleFetchDriveInfo}
+                                                    disabled={!driveFolderUrl || isFetchingDrive}
+                                                 >
+                                                    {isFetchingDrive ? 'Lendo...' : 'Ler Pasta'}
+                                                 </Button>
+                                             </div>
+                                             <p className="text-xs text-muted-foreground">
+                                                 O sistema irá buscar automaticamente o maior arquivo de vídeo nesta pasta.
+                                             </p>
+                                         </div>
+
+                                         <div className="space-y-2">
+                                             <Label htmlFor="drive-url">URL do Vídeo (Direto)</Label>
+                                             <Input 
+                                                id="drive-url"
+                                                value={driveVideoUrl}
+                                                onChange={(e) => setDriveVideoUrl(e.target.value)}
+                                                placeholder="https://drive.google.com/file/d/..."
+                                             />
+                                         </div>
+
+                                         <div className="space-y-2">
+                                             <Label htmlFor="custom-poster">URL do Pôster (Opcional)</Label>
+                                             <Input 
+                                                id="custom-poster"
+                                                value={customPosterUrl}
+                                                onChange={(e) => setCustomPosterUrl(e.target.value)}
+                                                placeholder="Cole o link do pôster aqui"
+                                             />
+                                         </div>
                                      </div>
 
-                                     <Button onClick={handleAddToCatalog} className="w-full">
+                                     <Button onClick={handleAddToCatalog} className="w-full mt-6" size="lg">
                                         Adicionar ao Catálogo
                                      </Button>
                                  </div>

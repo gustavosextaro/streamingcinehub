@@ -7,6 +7,8 @@ import { WatchlistButton } from "./watchlist-button";
 import { ManualPosterButton } from "./manual-poster-button";
 import { MoviePlayerSection } from "./movie-player-section";
 
+import { DeleteMovieButton } from "./delete-button";
+
 export default async function MovieDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const movieId = parseInt(id, 10);
@@ -57,10 +59,18 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
             {movie.runtime && <span>{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}min</span>}
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-6">
-            {movie.genres?.map(genre => (
-              <Badge key={genre.id} variant="secondary">{genre.name}</Badge>
-            ))}
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="flex gap-2">
+              {movie.genres?.map(genre => (
+                <Badge key={genre.id} variant="secondary">{genre.name}</Badge>
+              ))}
+            </div>
+            
+            <DeleteMovieButton 
+              movieId={movie.id} 
+              movieTitle={movie.title} 
+              documentId={movie.documentId}
+            />
           </div>
           
           <MoviePlayerSection movie={JSON.parse(JSON.stringify(movie))} />
