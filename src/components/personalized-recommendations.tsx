@@ -7,6 +7,7 @@ import { MovieCarousel } from './movie-carousel';
 import { Skeleton } from './ui/skeleton';
 import { useFirestore } from '@/firebase';
 import { getTrending } from '@/lib/tmdb';
+import { deduplicateMovies } from '@/lib/dedup-movies';
 
 export function PersonalizedRecommendations() {
   const { user, profile } = useProfile();
@@ -20,7 +21,7 @@ export function PersonalizedRecommendations() {
       // Use trending movies as recommendations for now
       try {
         const trending = await getTrending();
-        setRecommendations(trending);
+        setRecommendations(deduplicateMovies(trending));
       } catch (e) {
         console.error("Failed to load recommendations", e);
       }

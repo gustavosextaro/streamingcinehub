@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-01-31T03:23:57.528Z",
+  "statistics": {
+    "total": 0,
+    "folders": 0,
+    "files": 0,
+    "transfer": 0,
+    "unknown": 0,
+    "embeddable": 0,
+    "notEmbeddable": 0
+  },
+  "problematicLinks": {
+    "count": 0,
+    "movies": []
+  },
+  "workingLinks": {
+    "count": 0,
+    "movies": []
+  },
+  "transferLinks": {
+    "count": 0,
+    "movies": []
+  },
+  "unknownLinks": {
+    "count": 0,
+    "movies": []
+  }
+}

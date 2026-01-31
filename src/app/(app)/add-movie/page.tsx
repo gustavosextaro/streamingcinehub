@@ -42,7 +42,7 @@ export default function AddMoviePage() {
                         ...movie,
                         genre_ids: movie.genres?.map(g => g.id) || [],
                         videos: { results: [] },
-                        trailer_url: undefined,
+                        trailer_url: null,
                         vote_average: 0, 
                     };
                     setFoundMovie(movieWithDefaults);

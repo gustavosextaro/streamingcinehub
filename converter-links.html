@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🔄 Conversor de Links do Google Drive</title>
+        <style>
+            body {
+                font-family:
+                    "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 900px;
+                margin: 50px auto;
+                padding: 30px;
+                background: linear-gradient(
+                    135deg,
+                    #667eea 0%,
+                    #764ba2 100%
+                );
+                color: white;
+            }
+            .container {
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            }
+            h1 {
+                text-align: center;
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            .subtitle {
+                text-align: center;
+                opacity: 0.9;
+                margin-bottom: 30px;
+            }
+            #log {
+                background: rgba(0, 0, 0, 0.5);
+                padding: 20px;
+                border-radius: 10px;
+                height: 400px;
+                overflow-y: auto;
+                font-family: "Courier New", monospace;
+                font-size: 14px;
+                line-height: 1.6;
+                margin-top: 20px;
+            }
+            .btn {
+                background: #4caf50;
+                color: white;
+                border: none;
+                padding: 15px 40px;
+                font-size: 18px;
+                border-radius: 50px;
+                cursor: pointer;
+                display: block;
+                margin: 30px auto;
+                transition: all 0.3s;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            }
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            }
+            .btn:disabled {
+                background: #666;
+                cursor: not-allowed;
+            }
+            .stats {
+                display: flex;
+                justify-content: space-around;
+                margin: 20px 0;
+                flex-wrap: wrap;
+            }
+            .stat {
+                background: rgba(255, 255, 255, 0.15);
+                padding: 15px 30px;
+                border-radius: 10px;
+                margin: 5px;
+                text-align: center;
+            }
+            .stat-value {
+                font-size: 2em;
+                font-weight: bold;
+                display: block;
+            }
+            .stat-label {
+                opacity: 0.8;
+                font-size: 0.9em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔄 Conversor de Links</h1>
+            <p class="subtitle">
+                Converte links de pastas do Google Drive em links diretos de
+                arquivos
+            </p>
+
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-value" id="total">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="success">0</span>
+                    <span class="stat-label">✅ Sucesso</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="failed">0</span>
+                    <span class="stat-label">❌ Falhas</span>
+                </div>
+            </div>
+
+            <button id="startBtn" class="btn" onclick="startConversion()">
+                🚀 Iniciar Conversão
+            </button>
+
+            <div id="log"></div>
+        </div>
+
+        <script type="module">
+            const API_KEY =
+                "AIzaSyAwumTt_BB-V34bYwg2qv1SXSJCadnxQZs";
+
+            function log(message, color = "white") {
+                const logDiv = document.getElementById("log");
+                const line = document.createElement("div");
+                line.style.color = color;
+                line.textContent = message;
+                logDiv.appendChild(line);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            function updateStats(total, success, failed) {
+                document.getElementById("total").textContent =
+                    total;
+                document.getElementById("success").textContent =
+                    success;
+                document.getElementById("failed").textContent =
+                    failed;
+            }
+
+            function isFolderLink(url) {
+                const urlLower = url.toLowerCase();
+                return urlLower.includes("/drive/folders/") ||
+                    urlLower.includes("/drive/u/");
+            }
+
+            function extractFolderId(url) {
+                const patterns = [
+                    /\/folders\/([a-zA-Z0-9_-]+)/,
+                    /\/drive\/u\/\d+\/folders\/([a-zA-Z0-9_-]+)/,
+                    /id=([a-zA-Z0-9_-]+)/,
+                ];
+
+                for (const pattern of patterns) {
+                    const match = url.match(pattern);
+                    if (match) return match[1];
+                }
+                return null;
+            }
+
+            async function getFilesInFolder(folderId) {
+                const apiUrl =
+                    `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name,mimeType,size)`;
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(
+                        `API Error: ${response.status}`,
+                    );
+                }
+                const data = await response.json();
+                return data.files || [];
+            }
+
+            function isVideoFile(file) {
+                const videoMimeTypes = [
+                    "video/mp4",
+                    "video/x-matroska",
+                    "video/avi",
+                    "video/quicktime",
+                    "video/x-msvideo",
+                    "video/webm",
+                ];
+                const videoExtensions = [
+                    ".mp4",
+                    ".mkv",
+                    ".avi",
+                    ".mov",
+                    ".webm",
+                    ".flv",
+                    ".wmv",
+                ];
+
+                if (
+                    file.mimeType &&
+                    videoMimeTypes.includes(
+                        file.mimeType.toLowerCase(),
+                    )
+                ) {
+                    return true;
+                }
+
+                if (file.name) {
+                    const nameLower = file.name.toLowerCase();
+                    return videoExtensions.some((ext) =>
+                        nameLower.endsWith(ext)
+                    );
+                }
+
+                return false;
+            }
+
+            async function convertFolderToFileLink(folderUrl) {
+                const folderId = extractFolderId(folderUrl);
+                if (!folderId) {
+                    return {
+                        link: null,
+                        status: "failed",
+                        error: "ID não encontrado",
+                    };
+                }
+
+                try {
+                    const files = await getFilesInFolder(
+                        folderId,
+                    );
+                    if (files.length === 0) {
+                        return {
+                            link: null,
+                            status: "no_video_found",
+                            error: "Pasta vazia",
+                        };
+                    }
+
+                    const videoFiles = files.filter(
+                        isVideoFile,
+                    );
+                    if (videoFiles.length === 0) {
+                        return {
+                            link: null,
+                            status: "no_video_found",
+                            error:
+                                `Nenhum vídeo (${files.length} arquivos)`,
+                        };
+                    }
+
+                    if (videoFiles.length > 1) {
+                        videoFiles.sort((a, b) =>
+                            (b.size || 0) - (a.size || 0)
+                        );
+                    }
+
+                    const videoFile = videoFiles[0];
+                    const directLink =
+                        `https://drive.google.com/file/d/${videoFile.id}/view`;
+                    return {
+                        link: directLink,
+                        status: "success",
+                    };
+                } catch (error) {
+                    return {
+                        link: null,
+                        status: "failed",
+                        error: error.message,
+                    };
+                }
+            }
+
+            window.startConversion = async function () {
+                const btn = document.getElementById("startBtn");
+                btn.disabled = true;
+                btn.textContent = "🔄 Processando...";
+
+                log(
+                    "🔄 INICIANDO CONVERSÃO DE LINKS",
+                    "#4CAF50",
+                );
+                log("=".repeat(80), "#666");
+
+                try {
+                    // Import Firebase
+                    const {
+                        getFirestore,
+                        collection,
+                        getDocs,
+                        doc,
+                        updateDoc,
+                    } = await import(
+                        "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+                    );
+                    const { initializeApp, getApps, getApp } =
+                        await import(
+                            "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"
+                        );
+
+                    const firebaseConfig = {
+                        "projectId": "studio-1424581667-39f18",
+                        "appId":
+                            "1:183217664315:web:ae8d600409713ad7cc871e",
+                        "apiKey":
+                            "AIzaSyClQXWX6roCR6yNzL55UvjL22nJ3yXMejk",
+                        "authDomain":
+                            "studio-1424581667-39f18.firebaseapp.com",
+                        "measurementId": "",
+                        "messagingSenderId": "183217664315",
+                    };
+
+                    let app = getApps().length === 0
+                        ? initializeApp(firebaseConfig)
+                        : getApp();
+                    const db = getFirestore(app);
+
+                    log("📦 Firebase conectado!", "#4CAF50");
+                    log(
+                        "🔍 Buscando filmes com links de pastas...",
+                        "#FFA500",
+                    );
+
+                    const snapshot = await getDocs(
+                        collection(db, "movies"),
+                    );
+                    const folderMovies = [];
+
+                    snapshot.forEach((docSnap) => {
+                        const data = docSnap.data();
+                        const url = data.drive_video_url;
+                        if (url && isFolderLink(url)) {
+                            folderMovies.push({
+                                id: docSnap.id,
+                                title: data.title,
+                                url,
+                            });
+                        }
+                    });
+
+                    log(
+                        `\n📁 Encontrados ${folderMovies.length} filmes com links de pastas\n`,
+                        "#FFD700",
+                    );
+
+                    let processed = 0;
+                    let successful = 0;
+                    let failed = 0;
+                    const results = [];
+
+                    for (const movie of folderMovies) {
+                        processed++;
+                        log(
+                            `[${processed}/${folderMovies.length}] 🎬 ${movie.title}`,
+                            "#FFFFFF",
+                        );
+
+                        const conversion =
+                            await convertFolderToFileLink(
+                                movie.url,
+                            );
+
+                        if (
+                            conversion.status === "success" &&
+                            conversion.link
+                        ) {
+                            await updateDoc(
+                                doc(db, "movies", movie.id),
+                                {
+                                    drive_video_url:
+                                        conversion.link,
+                                },
+                            );
+                            log(`   ✅ Convertido!`, "#4CAF50");
+                            successful++;
+                        } else {
+                            log(
+                                `   ❌ ${conversion.error}`,
+                                "#FF5252",
+                            );
+                            failed++;
+                        }
+
+                        updateStats(
+                            processed,
+                            successful,
+                            failed,
+                        );
+
+                        results.push({
+                            movieId: movie.id,
+                            title: movie.title,
+                            oldLink: movie.url,
+                            newLink: conversion.link,
+                            status: conversion.status,
+                            error: conversion.error,
+                        });
+
+                        if (processed % 50 === 0) {
+                            log(
+                                `\n📊 Progresso: ${processed}/${folderMovies.length} (${successful} sucesso, ${failed} falhas)\n`,
+                                "#FFA500",
+                            );
+                        }
+
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 100)
+                        );
+                    }
+
+                    log("\n" + "=".repeat(80), "#666");
+                    log("📊 ESTATÍSTICAS FINAIS", "#4CAF50");
+                    log("=".repeat(80), "#666");
+                    log(`Total: ${processed}`, "#FFFFFF");
+                    log(
+                        `✅ Sucesso: ${successful} (${
+                            (successful / processed * 100)
+                                .toFixed(1)
+                        }%)`,
+                        "#4CAF50",
+                    );
+                    log(
+                        `❌ Falhas: ${failed} (${
+                            (failed / processed * 100).toFixed(
+                                1,
+                            )
+                        }%)`,
+                        "#FF5252",
+                    );
+                    log("\n✅ CONVERSÃO CONCLUÍDA!", "#4CAF50");
+
+                    // Download report
+                    const report = {
+                        timestamp: new Date().toISOString(),
+                        statistics: {
+                            total: processed,
+                            successful,
+                            failed,
+                            successRate:
+                                (successful / processed * 100)
+                                    .toFixed(2) + "%",
+                        },
+                        results,
+                    };
+
+                    const blob = new Blob([
+                        JSON.stringify(report, null, 2),
+                    ], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "conversion-report.json";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    btn.textContent = "✅ Conversão Concluída!";
+                } catch (error) {
+                    log(`❌ Erro: ${error.message}`, "#FF5252");
+                    console.error(error);
+                    btn.disabled = false;
+                    btn.textContent = "🔄 Tentar Novamente";
+                }
+            };
+        </script>
+    </body>
+</html>

@@ -10,64 +10,71 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from '@/components/ui/input';
-import { searchMovies, getDiscover, getGenres } from '@/lib/tmdb';
+import { deduplicateMovies } from '@/lib/dedup-movies';
+import { useFirestore } from '@/firebase';
+import { searchMoviesInFirestore, getMoviesByGenreId, getAllGenresFromFirestore } from '@/lib/firestore-movies';
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const firestore = useFirestore();
 
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
+  const [genres, setGenres] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1); // Not fully implemented for Firestore yet
   const [isPending, startTransition] = useTransition();
 
   const query = searchParams.get('q');
-  const genre = searchParams.get('genre');
+  const genreId = searchParams.get('genre');
   const year = searchParams.get('year');
 
+  // Load genres on mount
   useEffect(() => {
-    const loadGenres = async () => {
-        const g = await getGenres();
+    async function loadGenres() {
+        if (!firestore) return;
+        const g = await getAllGenresFromFirestore(firestore);
         setGenres(g);
     }
     loadGenres();
-  }, []);
+  }, [firestore]);
 
+  // Fetch movies based on filters
   useEffect(() => {
     const fetchMovies = async () => {
+      if (!firestore) return;
+      
       setLoading(true);
       setMovies([]);
       setPage(1);
 
       try {
+          let results: Movie[] = [];
+
           if (query) {
-             const data = await searchMovies(query);
-             setMovies(data.results);
-             setTotalPages(data.total_pages);
-          } else if (genre || year) {
-             const filters: Record<string, string> = {};
-             if (genre && genre !== 'all') filters.with_genres = genre;
-             // Note: getDiscover might not support year yet, but let's assume valid TMDB integration
-             // Actually my getDiscover in tmdb.ts matches filters.
-             const data = await getDiscover(filters); 
-             // Year filtering might need CLIENT SIDE or api update. 
-             // My getDiscover only handles genres (line 60 of tmdb.ts).
-             // I should filter by year here if needed or update tmdb.ts.
-             // Given time constraints, I will do client side year filter if API doesn't support.
-             let results = data.results;
+             // Search by title
+             results = await searchMoviesInFirestore(firestore, query, 100);
+          } else if (genreId || year) {
+             // Filter by Genre or Year
+             if (genreId && genreId !== 'all') {
+                 // Use efficient Firestore array-contains query for genre ID
+                 results = await getMoviesByGenreId(firestore, parseInt(genreId), 100);
+             } else {
+                 // No genre, just year or all
+                 results = await searchMoviesInFirestore(firestore, "", 100);
+             }
+
              if (year) {
                  results = results.filter(m => m.release_date && m.release_date.startsWith(year));
              }
-             setMovies(results);
-             setTotalPages(data.total_pages);
           } else {
-             // Default: Show all (discover)
-             const data = await getDiscover();
-             setMovies(data.results);
-             setTotalPages(data.total_pages);
+             // Default: Show all (limit 100)
+             results = await searchMoviesInFirestore(firestore, "", 100);
           }
+          
+          setMovies(deduplicateMovies(results));
+          setTotalPages(1); // Pagination not implemented
       } catch (e) {
           console.error(e);
       }
@@ -75,8 +82,11 @@ function SearchContent() {
       setLoading(false);
     };
     
-    fetchMovies();
-  }, [query, genre, year]);
+    // Only run if firestore is ready
+    if (firestore) {
+        fetchMovies();
+    }
+  }, [query, genreId, year, firestore, genres]); // Added genres to dependency to retry if loaded later
 
   const loadMore = async () => {
     // Implement pagination if needed
@@ -105,7 +115,7 @@ function SearchContent() {
     });
   };
 
-  const hasActiveFilters = genre || year;
+  const hasActiveFilters = genreId || year;
   const pageTitle = query 
     ? `Resultados para "${query}"` 
     : hasActiveFilters 
@@ -135,7 +145,7 @@ function SearchContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="genre">Gênero</Label>
-                        <Select name="genre" defaultValue={genre || 'all'}>
+                        <Select name="genre" defaultValue={genreId || 'all'}>
                         <SelectTrigger id="genre" className="bg-background">
                             <SelectValue placeholder="Selecione um gênero" />
                         </SelectTrigger>
@@ -165,14 +175,10 @@ function SearchContent() {
             <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
                     {movies.map(movie => (
-                    <MovieCard key={`${movie.id}-${page}`} movie={movie} />
+                    <MovieCard key={movie.id} movie={movie} />
                     ))}
                 </div>
-                {page < totalPages && (
-                    <div className="flex justify-center mt-8">
-                    <Button onClick={loadMore} disabled>Carregar Mais</Button>
-                    </div>
-                )}
+                {/* Pagination remove for now until implemented or basic load more */}
             </>
         )}
     </>

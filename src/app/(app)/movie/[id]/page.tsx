@@ -1,12 +1,11 @@
 import { getMovieDetails, getBackdropUrl, getPosterUrl, getRelatedMovies } from "@/lib/tmdb";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { MovieCarousel } from "@/components/movie-carousel";
 import { notFound } from "next/navigation";
 import { WatchlistButton } from "./watchlist-button";
 import { ManualPosterButton } from "./manual-poster-button";
-import Link from "next/link";
+import { MoviePlayerSection } from "./movie-player-section";
 
 export default async function MovieDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -64,29 +63,7 @@ export default async function MovieDetailsPage({ params }: { params: Promise<{ i
             ))}
           </div>
           
-          <div className="flex flex-wrap gap-4 mb-6">
-            <WatchlistButton 
-                movieId={movie.id} 
-                movieData={{ 
-                    title: movie.title, 
-                    poster_path: movie.poster_path, 
-                    release_date: movie.release_date,
-                    runtime: movie.runtime 
-                }}
-            />
-            {movie.trailer_url ? (
-              <Button asChild>
-                <Link href={movie.trailer_url} target="_blank" rel="noopener noreferrer">
-                  Assistir
-                </Link>
-              </Button>
-            ) : (
-              <Button variant="outline" disabled>
-                Assistir
-              </Button>
-            )}
-            <ManualPosterButton movie={JSON.parse(JSON.stringify(movie))} />
-          </div>
+          <MoviePlayerSection movie={JSON.parse(JSON.stringify(movie))} />
           
           {movie.tagline && <p className="text-lg font-bold font-headline mb-2">{movie.tagline}</p>}
           <p className="text-base text-muted-foreground max-w-prose">{movie.overview}</p>

@@ -23,6 +23,11 @@ export function MovieCarousel({ title, movies, genreId }: MovieCarouselProps) {
     return null;
   }
   
+  // Remove duplicate movies by ID
+  const uniqueMovies = Array.from(
+    new Map(movies.map(movie => [movie.id, movie])).values()
+  );
+  
   return (
     <section className="py-6 md:py-8">
       <div className="flex justify-between items-baseline px-4 md:px-8 lg:px-12 mb-4">
@@ -42,7 +47,7 @@ export function MovieCarousel({ title, movies, genreId }: MovieCarouselProps) {
         className="w-full"
       >
         <CarouselContent className="-ml-4 px-4 md:px-8 lg:px-12">
-          {movies.map((movie) => (
+          {uniqueMovies.map((movie) => (
             <CarouselItem key={movie.id} className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 2xl:basis-1/8 pl-4">
               <MovieCard movie={movie} />
             </CarouselItem>

@@ -12,7 +12,7 @@ export interface Movie {
   genre_ids: number[];
   runtime?: number;
   genres?: { id: number; name: string }[];
-  trailer_url?: string;
+  trailer_url?: string | null;
 }
 
 export interface MovieDetails extends Movie {
@@ -24,6 +24,7 @@ export interface MovieDetails extends Movie {
       type: string;
     }[];
   };
+  drive_video_url?: string;
 }
 
 export interface PaginatedResponse<T> {

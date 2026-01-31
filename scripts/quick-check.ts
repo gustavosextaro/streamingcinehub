@@ -1,54 +1,102 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
-import * as fs from 'fs';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
+// Firebase configuration
 const firebaseConfig = {
-  projectId: "studio-1424581667-39f18",
-  appId: "1:183217664315:web:ae8d600409713ad7cc871e",
-  apiKey: "AIzaSyClQXWX6roCR6yNzL55UvjL22nJ3yXMejk",
-  authDomain: "studio-1424581667-39f18.firebaseapp.com",
-  measurementId: "",
-  messagingSenderId: "183217664315"
+  apiKey: "AIzaSyCUl9BLYTr4cwxkUJ_gDzzYrDnVDI-Qv58",
+  authDomain: "cinehub-fa50c.firebaseapp.com",
+  projectId: "cinehub-fa50c",
+  storageBucket: "cinehub-fa50c.firebasestorage.app",
+  messagingSenderId: "680598528226",
+  appId: "1:680598528226:web:bde00a4fcdc3464a69ba98"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 async function quickCheck() {
-    const moviesRef = collection(db, "movies");
+  console.log('\n🔍 VERIFICAÇÃO RÁPIDA DO BANCO DE DADOS\n' + '='.repeat(80));
+  
+  try {
+    // First, try to get the specific movie we tested (Greice - ID: 1067231)
+    console.log('\n1️⃣ Buscando filme específico (Greice - ID: 1067231)...');
+    const testMovieRef = doc(db, 'movies', '1067231');
+    const testMovieSnap = await getDoc(testMovieRef);
+    
+    if (testMovieSnap.exists()) {
+      const data = testMovieSnap.data();
+      console.log('✅ Filme encontrado!');
+      console.log(`   Título: ${data.title}`);
+      console.log(`   drive_video_url: ${data.drive_video_url || 'NÃO DEFINIDO'}`);
+      console.log(`   Link: ${data.drive_video_url?.substring(0, 80)}...`);
+    } else {
+      console.log('❌ Filme não encontrado!');
+    }
+    
+    // Now fetch all movies
+    console.log('\n2️⃣ Buscando todos os filmes...');
+    const moviesRef = collection(db, 'movies');
     const snapshot = await getDocs(moviesRef);
     
-    const tmdbIds = new Map<string, number>();
-    const docIds = new Set<string>();
+    console.log(`✅ Total de filmes no banco: ${snapshot.size}`);
+    
+    // Count movies with drive_video_url
+    let withLinks = 0;
+    let withFolderLinks = 0;
+    let withFileLinks = 0;
+    let withTransferLinks = 0;
+    const sampleMovies: any[] = [];
     
     snapshot.forEach((doc) => {
-        const data = doc.data();
-        const tmdbId = data.id;
-        const docId = doc.id;
+      const data = doc.data();
+      const url = data.drive_video_url;
+      
+      if (url && url.trim() !== '') {
+        withLinks++;
         
-        docIds.add(docId);
-        tmdbIds.set(tmdbId, (tmdbIds.get(tmdbId) || 0) + 1);
+        // Save first 5 as samples
+        if (sampleMovies.length < 5) {
+          sampleMovies.push({
+            id: doc.id,
+            title: data.title,
+            url: url.substring(0, 60) + '...'
+          });
+        }
+        
+        // Categorize
+        const urlLower = url.toLowerCase();
+        if (urlLower.includes('/drive/folders/') || urlLower.includes('/drive/u/')) {
+          withFolderLinks++;
+        } else if (urlLower.includes('/file/d/')) {
+          withFileLinks++;
+        } else if (urlLower.includes('transfer.it') || urlLower.includes('we.tl')) {
+          withTransferLinks++;
+        }
+      }
     });
     
-    const duplicates = Array.from(tmdbIds.entries()).filter(([_, count]) => count > 1);
+    console.log(`\n📊 ESTATÍSTICAS:`);
+    console.log(`   Filmes com drive_video_url: ${withLinks}`);
+    console.log(`   Links de PASTAS (erro 403): ${withFolderLinks}`);
+    console.log(`   Links de ARQUIVOS (OK): ${withFileLinks}`);
+    console.log(`   Links Transfer.it: ${withTransferLinks}`);
     
-    const report = {
-        totalDocuments: snapshot.size,
-        uniqueDocIds: docIds.size,
-        uniqueTmdbIds: tmdbIds.size,
-        duplicateCount: duplicates.length,
-        duplicates: duplicates.slice(0, 20).map(([id, count]) => ({
-            tmdbId: id,
-            count,
-            title: snapshot.docs.find(d => d.data().id === id)?.data().title
-        }))
-    };
+    if (sampleMovies.length > 0) {
+      console.log(`\n📝 EXEMPLOS DE FILMES COM LINKS:`);
+      sampleMovies.forEach((m, i) => {
+        console.log(`   ${i + 1}. ${m.title} (ID: ${m.id})`);
+        console.log(`      ${m.url}`);
+      });
+    }
     
-    console.log(JSON.stringify(report, null, 2));
-    fs.writeFileSync('duplicate-report.json', JSON.stringify(report, null, 2));
+    console.log('\n' + '='.repeat(80));
+    console.log('✅ Verificação concluída!\n');
+    
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    process.exit(1);
+  }
 }
 
-quickCheck().catch(console.error);
+quickCheck();
