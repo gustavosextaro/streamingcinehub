@@ -3,7 +3,7 @@ import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firesto
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCUl9BLYTr4cwxkUJ_gDzzYrDnVDI-Qv58",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "SUA_API_KEY_AQUI",
   authDomain: "cinehub-fa50c.firebaseapp.com",
   projectId: "cinehub-fa50c",
   storageBucket: "cinehub-fa50c.firebasestorage.app",
